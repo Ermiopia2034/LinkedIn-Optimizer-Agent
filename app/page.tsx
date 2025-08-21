@@ -146,7 +146,7 @@ export default function LinkedInOptimizer() {
       setShowModal(true)
       setFormData({ userLinkedIn: '', competitorUrls: '', targetPosition: '' })
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Submit error:', error)
       // Error handling without toast
     } finally {
