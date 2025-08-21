@@ -2,72 +2,33 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Sparkles, 
-  ArrowRight, 
-  CheckCircle2, 
-  Loader2, 
+import {
+  Sparkles,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
   TrendingUp,
   Users,
   Target,
   Mail,
   LogOut,
-  FileText,
-  Calendar,
   BarChart3
 } from 'lucide-react'
-import toast, { Toaster } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 
-interface AnalysisResult {
-  id: string;
-  request_id: string;
-  user_id: string;
-  result_data: Record<string, unknown>;
-  created_at: string;
-}
-
-interface AnalysisRequest {
-  id: string;
-  user_id: string;
-  request_id: string;
-  user_linkedin_url: string;
-  competitor_urls: string[];
-  target_position: string;
-  status: 'processing' | 'completed' | 'failed';
-  created_at: string;
-  completed_at: string | null;
-  analysis_results: AnalysisResult[] | null;
-}
 
 export default function LinkedInOptimizer() {
   const [email, setEmail] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
+  const [showModal, setShowModal] = useState(false)
   const [formData, setFormData] = useState({
     userLinkedIn: '',
     competitorUrls: '',
     targetPosition: ''
   })
-  const [analysisHistory, setAnalysisHistory] = useState<AnalysisRequest[]>([])
-  const [selectedResult, setSelectedResult] = useState<AnalysisRequest | null>(null)
 
-  const loadAnalysisHistory = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('analysis_requests')
-      .select(`
-        *,
-        analysis_results (*)
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-
-    if (data) {
-      setAnalysisHistory(data as AnalysisRequest[])
-    }
-  }, [])
 
   const checkAuth = useCallback(async () => {
     const storedEmail = localStorage.getItem('userEmail')
@@ -77,15 +38,14 @@ export default function LinkedInOptimizer() {
         .select('*')
         .eq('email', storedEmail)
         .single()
-      
+
       if (data) {
         localStorage.setItem('userId', data.id)
         setIsAuthenticated(true)
         setUserEmail(storedEmail)
-        loadAnalysisHistory(data.id)
       }
     }
-  }, [loadAnalysisHistory])
+  }, [])
 
   useEffect(() => {
     checkAuth()
@@ -125,10 +85,8 @@ export default function LinkedInOptimizer() {
       localStorage.setItem('userId', user.id)
       setIsAuthenticated(true)
       setUserEmail(email)
-      loadAnalysisHistory(user.id)
-      toast.success('Successfully logged in!')
     } catch (error) {
-      toast.error('Authentication failed')
+      console.error('Authentication failed:', error)
     } finally {
       setIsLoading(false)
     }
@@ -185,17 +143,12 @@ export default function LinkedInOptimizer() {
         throw new Error(`Analysis failed: ${response.statusText}`)
       }
 
-      toast.success('Analysis started! Results will be ready in 2-3 minutes.')
+      setShowModal(true)
       setFormData({ userLinkedIn: '', competitorUrls: '', targetPosition: '' })
-      
-      // Refresh history after a delay
-      setTimeout(() => {
-        loadAnalysisHistory(userId)
-      }, 5000)
       
     } catch (error: any) {
       console.error('Submit error:', error)
-      toast.error(error.message || 'Failed to start analysis')
+      // Error handling without toast
     } finally {
       setIsLoading(false)
     }
@@ -206,8 +159,6 @@ export default function LinkedInOptimizer() {
     localStorage.removeItem('userId')
     setIsAuthenticated(false)
     setUserEmail('')
-    setAnalysisHistory([])
-    toast.success('Logged out successfully')
   }
 
   if (!isAuthenticated) {
@@ -282,7 +233,6 @@ export default function LinkedInOptimizer() {
             </div>
           </motion.div>
         </div>
-        <Toaster position="top-right" />
       </div>
     )
   }
@@ -312,38 +262,11 @@ export default function LinkedInOptimizer() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Tabs */}
-        <div className="flex gap-2 mb-8">
-          <button
-            onClick={() => setActiveTab('new')}
-            className={`px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'new'
-                ? 'bg-white/20 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10'
-            }`}
-          >
-            New Analysis
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${activeTab === 'history'
-                ? 'bg-white/20 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            History ({analysisHistory.length})
-          </button>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {activeTab === 'new' ? (
-            <motion.div
-              key="new"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="grid lg:grid-cols-2 gap-8"
-            >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid lg:grid-cols-2 gap-8"
+        >
               {/* Form */}
               <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20">
                 <h2 className="text-2xl font-bold text-white mb-6">Start New Analysis</h2>
@@ -465,94 +388,45 @@ https://linkedin.com/in/competitor1, https://linkedin.com/in/competitor2"
                   </div>
                 </div>
               </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="history"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-            >
-              {analysisHistory.length === 0 ? (
-                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 border border-white/20 text-center">
-                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No analyses yet</h3>
-                  <p className="text-gray-300">Start your first analysis to see results here</p>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {analysisHistory.map((item) => (
-                    <motion.div
-                      key={item.id}
-                      whileHover={{ scale: 1.01 }}
-                      className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 cursor-pointer hover:bg-white/15 transition-colors"
-                      onClick={() => setSelectedResult(item)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-white mb-2">
-                            {item.target_position.substring(0, 50)}...
-                          </h3>
-                          <div className="flex items-center gap-4 text-sm text-gray-300">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(item.created_at).toLocaleDateString()}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              {item.competitor_urls.length} competitors
-                            </div>
-                          </div>
-                        </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${item.status === 'completed' 
-                            ? 'bg-green-500/20 text-green-400'
-                            : item.status === 'processing'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {item.status}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </motion.div>
       </div>
 
-      {/* Result Modal */}
+      {/* Analysis Modal */}
       <AnimatePresence>
-        {selectedResult && (
+        {showModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedResult(null)}
+            onClick={() => setShowModal(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 rounded-3xl p-8 max-w-4xl max-h-[80vh] overflow-y-auto border border-white/20"
+              className="bg-slate-900 rounded-3xl p-8 max-w-md w-full border border-white/20 text-center"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-2xl font-bold text-white mb-6">Analysis Results</h2>
-              {selectedResult.analysis_results?.[0]?.result_data ? (
-                <pre className="bg-white/5 rounded-xl p-4 text-sm text-gray-300 overflow-x-auto">
-                  {JSON.stringify(selectedResult.analysis_results[0].result_data, null, 2)}
-                </pre>
-              ) : (
-                <p className="text-gray-400">Analysis is still processing. Check back soon!</p>
-              )}
+              <div className="flex items-center justify-center mb-6">
+                <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl">
+                  <BarChart3 className="w-8 h-8 text-white" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-4">Analysis Started!</h2>
+              <p className="text-gray-300 mb-6">
+                Your analysis request is being processed on our server. The results will be sent to your email shortly.
+              </p>
+              <button
+                onClick={() => setShowModal(false)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200"
+              >
+                Got it!
+              </button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <Toaster position="top-right" />
     </div>
   )
 }
